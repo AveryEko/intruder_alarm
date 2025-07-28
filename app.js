@@ -1,30 +1,76 @@
-// Node.js server to receive alerts from Arduino (ESP-01)
-// Install Express first: npm install express
-
 const express = require('express');
+const session = require('express-session');
+const path = require('path');
+
 const app = express();
-const port = 3000; // Use 80 if you want it public without a port number
+const port = 3000;
 
-// CORS Middleware (for allowing frontend access if needed)
+let alarmStatus = 'Disarmed'; // 🔒 shared system state
+
+// Sessions
+app.use(session({
+  secret: 'secret-key',
+  resave: false,
+  saveUninitialized: true
+}));
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+// Auth middleware
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  next();
+  const openRoutes = ['/', '/login', '/login.html'];
+  const isPublicAsset = req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.png') || req.path.endsWith('.ico');
+
+  if (openRoutes.includes(req.path) || isPublicAsset || req.session.loggedIn) {
+    return next();
+  } else {
+    return res.redirect('/login.html');
+  }
 });
 
-// Simple GET endpoint that Arduino will hit on intruder detection
-app.get('/alert', (req, res) => {
-  console.log('⚠️ Intruder alert received from Arduino!');
-  // You can save to a file, log, or trigger further actions
-  res.send('Alert received');
+// Serve frontend
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Login
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Optional: Frontend can fetch this to get latest status
-let lastAlertTime = null;
+app.post('/login.html', (req, res) => {
+  const { username, password } = req.body;
+  if (username === 'admin' && password === '1234') {
+    req.session.loggedIn = true;
+    res.redirect('/UI.html');
+  } else {
+    res.send('Login failed. <a href="/login.html">Try again</a>');
+  }
+});
+
+// Logout
+app.get('/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.redirect('/login.html');
+  });
+});
+
+// GET current alarm status
 app.get('/status', (req, res) => {
-  res.json({ lastAlert: lastAlertTime });
+  res.json({ status: alarmStatus });
 });
 
-// Start server
+// Arm system
+app.post('/arm', (req, res) => {
+  alarmStatus = 'Armed';
+  res.send("System successfully armed.");
+});
+
+// Disarm system
+app.post('/disarm', (req, res) => {
+  alarmStatus = 'Disarmed';
+  res.send("System successfully disarmed.");
+});
+
 app.listen(port, () => {
-  console.log(`✅ Alert server running at http://localhost:${port}`);
+  console.log(`✅ Server running at http://localhost:${port}`);
 });

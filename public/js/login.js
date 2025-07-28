@@ -16,8 +16,8 @@ document.getElementById("loginForm").addEventListener("submit", function (e) {
     message.style.color = "lime";
     message.textContent = "Login successful!";
     setTimeout(() => {
-      window.location.href = "UI.html"; //redirect to UI page
-    }, 1000);
+      window.location.href = "/UI.html"; //redirect to UI page
+    }, 500);
   } else {
     message.style.color = "red";
     message.textContent = "Invalid username or password";
