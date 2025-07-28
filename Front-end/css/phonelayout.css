@@ -1,0 +1,55 @@
+body {
+  margin: 0;
+  background: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Base phone dimensions */
+.phone-wrapper {
+  position: relative;
+  height: 100vh;
+  aspect-ratio: 9 / 19.5; /* Typical phone screen ratio */
+  max-height: 100vh;
+  max-width: 100vw;
+  overflow: visible;
+}
+
+.phone-background {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 20px;
+  display: block;
+}
+
+/* Intruder App Icon Overlay */
+.app-icon {
+  position: absolute;
+  top: 58%;     /* align to bottom row */
+  left: 59%;      /* beside Settings */
+  width: auto;
+  text-align: center;
+  color: white;
+  font-family: sans-serif;
+  cursor: pointer;
+
+}
+
+.app-icon img {
+  width: 7vh;
+  height: 7vh;
+  border-radius: 12px;
+  display: block;
+  margin: 0 auto;
+}
+
+.app-icon span {
+  font-size: 3vh;
+  white-space: nowrap;
+  display: block;
+  margin-top: 4px;
+}

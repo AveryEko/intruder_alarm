@@ -1,0 +1,105 @@
+body {
+  background-color: black;
+  color: white;
+  font-family: Arial, sans-serif;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0;
+}
+
+.container {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 30px;
+  border-radius: 10px;
+  width: 320px;
+}
+
+.status {
+  margin: 20px 0;
+  font-size: 1.2em;
+  font-weight: bold;
+  padding: 10px;
+  border-radius: 5px;
+  background-color: #222;
+}
+
+.button-group button {
+  padding: 10px 20px;
+  margin: 10px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: white;
+    padding: 10px 20px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+
+}
+
+#armBtn {
+  background-color: red;
+}
+
+#disarmBtn {
+  background-color: green;
+}
+
+.feedback {
+  margin-top: 15px;
+  color: orange;
+  font-size: 0.9em;
+}
+
+
+.modal {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.6);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 99;
+}
+
+.modal-content {
+  background: #222;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+  width: 90%;
+  max-width: 320px;
+}
+
+.modal-content input {
+  width: 80%;
+  padding: 10px;
+  font-size: 18px;
+  text-align: center;
+  margin-top: 10px;
+  border-radius: 8px;
+  border: none;
+}
+
+.modal-buttons {
+  margin-top: 15px;
+  display: flex;
+  justify-content: space-around;
+}
+
+.modal-buttons button {
+  padding: 10px 20px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#error-msg, .error-msg {
+  color: red;
+  font-size: 14px;
+  margin-top: 10px;
+}

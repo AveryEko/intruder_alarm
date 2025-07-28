@@ -1,0 +1,61 @@
+body {
+  margin: 0;
+  background: url("/img/image.png") no-repeat center center fixed;
+  background-size: cover;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.login-container {
+  background: rgba(0, 0, 0, 0.6);
+  padding: 30px;
+  border-radius: 10px;
+  width: 300px;
+  text-align: center;
+  color: white;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  border-radius: 5px;
+  border: none;
+  font-size: 16px;
+  background: #fff;
+  color: #000;
+}
+
+input::placeholder {
+  color: #666; /* darker placeholder */
+}
+
+button {
+  width: 100%;
+  padding: 10px;
+  background: teal;
+  border: none;
+  color: white;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+#message {
+  margin-top: 10px;
+  font-weight: bold;
+}
+
+.password-wrapper {
+  position: relative;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #333;
+}

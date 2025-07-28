@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intruder Alarm Interface</title>
+  <link rel="stylesheet" href="/css/UI.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Intruder Alarm System</h1>
+    <div id="status" class="status">System is Disarmed</div>
+    <div class="button-group">
+      <button id="armBtn">Arm</button>
+      <button id="disarmBtn">Disarm</button>
+    </div>
+    <div id="feedback" class="feedback"></div>
+  </div>
+
+  <!-- Add inside the <body> -->
+<div class="modal" id="pinModal">
+  <div class="modal-content">
+    <h3>Enter 6-digit PIN</h3>
+    <input type="password" id="pinInput" maxlength="6" placeholder="******" />
+    <div class="modal-buttons">
+      <button id="cancelBtn">Cancel</button>
+      <button id="confirmBtn">Confirm</button>
+    </div>
+    <div id="pinError" class="error-msg"></div>
+  </div>
+</div>
+
+
+  <script src="/js/UI.js"></script>
+</body>
+</html>

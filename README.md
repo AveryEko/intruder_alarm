@@ -7,3 +7,9 @@ Hardware used:
   ESP 01, wifi module
   ESP 32, camera module
   
+# code
+Modules required:
+  Node.js
+  express
+
+To host website, run: "node app.js"
