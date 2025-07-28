@@ -6,6 +6,15 @@ Hardware used:
   Infrared sensor
   ESP 01, wifi module
   ESP 32, camera module
+  Wifi/Hotspot device
+
+# applications used
+  VSCode
+  Arduino IDE (Arduino board & ESP32 module)
+  BotFather (To display messages on telegram)
+    .Modify bot token and chat id in Arduino code
+  Thinkspeak (Controlling intruder alarm via application)
+  Firebase (Realtime database)
   
 # code (run npm install "module_name")
 Modules required:
