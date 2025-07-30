@@ -139,8 +139,8 @@ void initWiFi() {
 }
 
 void sendWiFiAlert() {
-  String botToken = "7961952677:AAF1moKF-FOMdqzjziN6WFI9-sKeFf7qCB4";
-  String chatID = "1677478547";
+  String botToken = "your-bot-token"; // Replace with your bot token
+  String chatID = "your-chat-id"; // Replace with your chat ID
   String message = "🚨 Intruder Alert! System has been triggered.";
 
   message.replace(" ", "%20");

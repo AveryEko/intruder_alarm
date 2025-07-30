@@ -9,7 +9,7 @@ Hardware used:
   Wifi/Hotspot device
 
 # applications used
-  VSCode e
+  VSCode
   Arduino IDE (Arduino board & ESP32 module)
   BotFather (To display messages on telegram)
     .Modify bot token and chat id in Arduino code
