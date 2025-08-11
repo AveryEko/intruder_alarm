@@ -1,7 +1,29 @@
 {
+  "name": "intruder-alarm-system",
+  "version": "1.0.0",
+  "description": "ESP32 Intruder Alarm System with Live Feed",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
   "dependencies": {
-    "express": "^5.1.0",
-    "express-session": "^1.18.2",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "firebase-admin": "^13.4.0",
+    "node": "^22.18.0",
+    "node-telegram-bot-api": "^0.66.0",
     "node.js": "^0.0.1-security"
-  }
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "esp32",
+    "alarm",
+    "iot",
+    "firebase"
+  ],
+  "author": "AveryEko",
+  "license": "MIT"
 }

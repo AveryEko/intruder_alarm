@@ -1,59 +1,87 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Intruder Alarm Interface</title>
-    <link rel="stylesheet" href="/css/UI.css" />
-  </head>
-  <body>
-    <div class="container">
-      <h1>Intruder Alarm System</h1>
-      <div id="status" class="status">Loading status...</div>
-      <div class="button-group">
-        <button id="armBtn">Arm</button>
-        <button id="disarmBtn">Disarm</button>
-        <button id="logoutBtn">
-          <a href="/logout" class="logout-button">Logout</a>
-        </button>
-      </div>
-      <div id="feedback" class="feedback"></div>
-    </div>
+<html>
+<head>
+  <title>Intruder Alarm Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body>
+  <h1>Intruder Alarm System</h1>
 
-    <!-- PIN Modal -->
-    <div class="modal" id="pinModal">
-      <div class="modal-content">
-        <h3>Enter 6-digit PIN</h3>
-        <input
-          type="password"
-          id="pinInput"
-          maxlength="6"
-          placeholder="******"
-        />
-        <div class="modal-buttons">
-          <button id="cancelBtn">Cancel</button>
-          <button id="confirmBtn">Confirm</button>
-        </div>
-        <div id="pinError" class="error-msg"></div>
-      </div>
+  <div id="controls">
+    <h2>System Controls</h2>
+    <div>
+      <label>ESP32-CAM:</label>
+      <button id="arm-esp32">Arm</button>
+      <button id="disarm-esp32">Disarm</button>
+      <span id="esp32-status"></span>
     </div>
-    <!-- ESP32-CAM Live Feed Modal -->
-    <div id="cameraModal" class="modal">
-      <div class="modal-content" style="width: 90%; height: auto">
-        <h3>Live Intruder Feed</h3>
-        <iframe
-          id="cameraFeed"
-          src=""
-          frameborder="0"
-          width="100%"
-          height="480"
-        ></iframe>
-        <div class="modal-buttons">
-          <button onclick="closeCameraModal()">Close</button>
-        </div>
-      </div>
+    <div>
+      <label>Arduino Uno:</label>
+      <button id="arm-arduino">Arm</button>
+      <button id="disarm-arduino">Disarm</button>
+      <span id="arduino-status"></span>
     </div>
+  </div>
 
-    <script src="/js/UI.js"></script>
-  </body>
+  <div id="alert">
+    <h2>Alerts</h2>
+    <div id="alert-content">No alerts.</div>
+  </div>
+
+  <a href="snapshots.html" class="btn">View Snapshots</a>
+
+  <script>
+    // TODO: Replace with your Firebase config!
+    var firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://fiot-aa4f5-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "fiot-aa4f5",
+      storageBucket: "fiot-aa4f5.appspot.com",
+      messagingSenderId: "YOUR_MESSAGING_ID",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    var statusRef = firebase.database().ref("systemStatus");
+    var alertRef = firebase.database().ref("alerts/lastAlert");
+
+    // Status updates
+    statusRef.child("esp32").on("value", function(snap) {
+      var data = snap.val();
+      document.getElementById("esp32-status").innerText =
+        "Status: " + (data && data.armed ? "Armed" : "Disarmed") + ", Motion: " + (data && data.motionDetected ? "Intruder!" : "Clear");
+    });
+    statusRef.child("arduino").on("value", function(snap) {
+      var data = snap.val();
+      document.getElementById("arduino-status").innerText =
+        "Status: " + (data && data.armed ? "Armed" : "Disarmed") + ", Motion: " + (data && data.motionDetected ? "Intruder!" : "Clear");
+    });
+
+    // Arm/disarm controls
+    document.getElementById("arm-esp32").onclick = function() {
+      statusRef.child("esp32").update({ armed: true });
+    };
+    document.getElementById("disarm-esp32").onclick = function() {
+      statusRef.child("esp32").update({ armed: false });
+    };
+    document.getElementById("arm-arduino").onclick = function() {
+      statusRef.child("arduino").update({ armed: true });
+    };
+    document.getElementById("disarm-arduino").onclick = function() {
+      statusRef.child("arduino").update({ armed: false });
+    };
+
+    // Alert monitor
+    alertRef.on("value", function(snap) {
+      var alert = snap.val();
+      if(alert && alert.type === "intruder") {
+        document.getElementById("alert-content").innerHTML =
+          `<b>Intruder Detected!</b> Device: ${alert.device} at ${alert.timestamp}`;
+      }
+    });
+  </script>
+</body>
 </html>

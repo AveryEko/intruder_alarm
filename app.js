@@ -5,7 +5,7 @@ const path = require('path');
 const app = express();
 const port = 3000;
 
-let alarmStatus = 'Disarmed'; // 🔒 shared system state
+let alarmStatus = 'Disarmed';
 
 // Sessions
 app.use(session({
@@ -17,10 +17,18 @@ app.use(session({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')));
+
 // Auth middleware
 app.use((req, res, next) => {
   const openRoutes = ['/', '/login', '/login.html'];
-  const isPublicAsset = req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.png') || req.path.endsWith('.ico');
+  const isPublicAsset = req.path.startsWith('/css') || 
+                       req.path.startsWith('/js') || 
+                       req.path.endsWith('.png') || 
+                       req.path.endsWith('.ico') ||
+                       req.path.endsWith('.jpg') ||
+                       req.path.endsWith('.jpeg');
 
   if (openRoutes.includes(req.path) || isPublicAsset || req.session.loggedIn) {
     return next();
@@ -29,12 +37,42 @@ app.use((req, res, next) => {
   }
 });
 
-// Serve frontend
-app.use(express.static(path.join(__dirname, 'public')));
+// Root route - redirect to login
+app.get('/', (req, res) => {
+  if (req.session.loggedIn) {
+    res.redirect('/UI.html');
+  } else {
+    res.redirect('/login.html');
+  }
+});
 
-// Login
+// Login routes
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.get('/login.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Main UI page
+app.get('/UI.html', (req, res) => {
+  if (req.session.loggedIn) {
+    res.sendFile(path.join(__dirname, 'public', 'UI.html'));
+  } else {
+    res.redirect('/login.html');
+  }
+});
+
+// Login POST
+app.post('/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === 'admin' && password === '1234') {
+    req.session.loggedIn = true;
+    res.redirect('/UI.html');
+  } else {
+    res.send('Login failed. <a href="/login.html">Try again</a>');
+  }
 });
 
 app.post('/login.html', (req, res) => {
@@ -54,23 +92,35 @@ app.get('/logout', (req, res) => {
   });
 });
 
-// GET current alarm status
+// API Routes for alarm system
 app.get('/status', (req, res) => {
   res.json({ status: alarmStatus });
 });
 
-// Arm system
 app.post('/arm', (req, res) => {
   alarmStatus = 'Armed';
-  res.send("System successfully armed.");
+  res.json({ success: true, message: "System successfully armed.", status: alarmStatus });
 });
 
-// Disarm system
 app.post('/disarm', (req, res) => {
   alarmStatus = 'Disarmed';
-  res.send("System successfully disarmed.");
+  res.json({ success: true, message: "System successfully disarmed.", status: alarmStatus });
 });
 
+app.post('/verify-pin', (req, res) => {
+  const { pin } = req.body;
+  const correctPin = '123456';
+  
+  if (pin === correctPin) {
+    res.json({ success: true });
+  } else {
+    res.json({ success: false, message: 'Invalid PIN' });
+  }
+});
+
+// Start server
 app.listen(port, () => {
-  console.log(`✅ Server running at http://localhost:${port}`);
+  console.log(`🚀 Intruder Alarm System running at http://localhost:${port}`);
+  console.log(`📱 Access the interface: http://localhost:${port}/UI.html`);
+  console.log(`🔑 Login: admin / 1234`);
 });
