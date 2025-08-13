@@ -1,0 +1,361 @@
+body {
+  background-color: #111;
+  color: #f8f9fa;
+  font-family: Arial, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* Container for main content */
+.container {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 32px;
+  border-radius: 12px;
+  max-width: 440px;
+  margin: 48px auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.16);
+  text-align: center;
+}
+
+/* Title styles */
+h1, h2, h3 {
+  color: #f8f9fa;
+  text-shadow: 1px 2px 12px rgba(0,0,0,0.3);
+  margin-bottom: 18px;
+}
+
+/* Alerts */
+#alert-content {
+  background: #2b2b2b;
+  color: #ffc107;
+  padding: 10px 18px;
+  border-radius: 6px;
+  margin-bottom: 18px;
+  font-size: 1.06em;
+}
+
+/* Status indicators */
+.status, .system-status {
+  margin: 20px 0;
+  font-size: 1.1em;
+  font-weight: bold;
+  padding: 12px 18px;
+  border-radius: 8px;
+  background: #222;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* Button styles */
+.button-group,
+.modal-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+button, .btn {
+  border: none;
+  border-radius: 8px;
+  padding: 12px 28px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: #007bff;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.20);
+  transition: background 0.3s, transform 0.2s;
+  outline: none;
+}
+button:hover, .btn:hover {
+  background: #0056b3;
+  transform: translateY(-2px);
+}
+#arm-esp32, #arm-arduino {
+  background: #dc3545;
+}
+#arm-esp32:hover, #arm-arduino:hover {
+  background: #a71d2a;
+}
+#disarm-esp32, #disarm-arduino {
+  background: #28a745;
+}
+#disarm-esp32:hover, #disarm-arduino:hover {
+  background: #17692e;
+}
+
+/* Feedback messages */
+.feedback, .error-msg, #error-msg {
+  margin-top: 10px;
+  color: #ff9800;
+  font-size: 0.98em;
+}
+.error-msg, #error-msg {
+  color: #ff5252;
+}
+
+/* Modal styles */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: #232323;
+  color: #f8f9fa;
+  padding: 28px;
+  border-radius: 16px;
+  width: 92%;
+  max-width: 440px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+}
+.modal-content input {
+  width: 82%;
+  padding: 10px;
+  font-size: 1em;
+  text-align: center;
+  margin: 18px 0 0 0;
+  border-radius: 8px;
+  border: none;
+  background: #333;
+  color: #fff;
+}
+
+/* Snapshot Gallery */
+#snapshot-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: center;
+  margin-top: 36px;
+}
+
+.snapshot-card {
+  background: #222;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.13);
+  padding: 10px;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.snapshot-card img {
+  width: 100%;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  background: #111;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+}
+.snapshot-card .timestamp {
+  font-size: 0.96em;
+  color: #ffc107;
+  text-align: right;
+  width: 100%;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .container {
+    padding: 12px;
+    max-width: 98vw;
+    margin: 0 2vw;
+  }
+  #snapshot-gallery {
+    gap: 10px;
+  }
+  .snapshot-card {
+    width: 98vw;
+    max-width: 320px;
+  }
+}
+
+@media (max-width: 480px) {
+  h1, h2 {
+    font-size: 1.2em;
+  }
+  .container, .modal-content {
+    padding: 12px;
+    max-width: 99vw;
+  }
+  button, .btn {
+    padding: 10px 16px;
+    font-size: 0.98em;
+  }
+  .snapshot-card {
+    padding: 6px;
+    min-width: 90vw;
+    max-width: 98vw;
+  }
+}
+
+body {
+  background-color: #111;
+  color: #f8f9fa;
+  font-family: Arial, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* Container for main content */
+.container {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 32px;
+  border-radius: 12px;
+  max-width: 440px;
+  margin: 48px auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.16);
+  text-align: center;
+}
+
+/* Title styles */
+h1, h2, h3 {
+  color: #f8f9fa;
+  text-shadow: 1px 2px 12px rgba(0,0,0,0.3);
+  margin-bottom: 18px;
+}
+
+/* Alerts */
+#alert-content {
+  background: #2b2b2b;
+  color: #ffc107;
+  padding: 10px 18px;
+  border-radius: 6px;
+  margin-bottom: 18px;
+  font-size: 1.06em;
+}
+
+/* Status indicators */
+.status, .system-status {
+  margin: 20px 0;
+  font-size: 1.1em;
+  font-weight: bold;
+  padding: 12px 18px;
+  border-radius: 8px;
+  background: #222;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* Button styles */
+.button-group,
+.modal-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+button, .btn {
+  border: none;
+  border-radius: 8px;
+  padding: 12px 28px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: #007bff;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.20);
+  transition: background 0.3s, transform 0.2s;
+  outline: none;
+}
+button:hover, .btn:hover {
+  background: #0056b3;
+  transform: translateY(-2px);
+}
+#arm-esp32 {
+  background: #dc3545;
+}
+#arm-esp32:hover {
+  background: #a71d2a;
+}
+#disarm-esp32 {
+  background: #28a745;
+}
+#disarm-esp32:hover {
+  background: #17692e;
+}
+
+/* Feedback messages */
+.feedback, .error-msg, #error-msg {
+  margin-top: 10px;
+  color: #ff9800;
+  font-size: 0.98em;
+}
+.error-msg, #error-msg {
+  color: #ff5252;
+}
+
+/* Snapshot Gallery */
+#snapshots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: center;
+  margin-top: 36px;
+}
+.snapshot-card {
+  background: #222;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.13);
+  padding: 10px;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.snapshot-card img {
+  width: 100%;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  background: #111;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+}
+.snapshot-card .timestamp {
+  font-size: 0.96em;
+  color: #ffc107;
+  text-align: right;
+  width: 100%;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .container {
+    padding: 12px;
+    max-width: 98vw;
+    margin: 0 2vw;
+  }
+  #snapshots {
+    gap: 10px;
+  }
+  .snapshot-card {
+    width: 98vw;
+    max-width: 320px;
+  }
+}
+@media (max-width: 480px) {
+  h1, h2 {
+    font-size: 1.2em;
+  }
+  .container {
+    padding: 12px;
+    max-width: 99vw;
+  }
+  button, .btn {
+    padding: 10px 16px;
+    font-size: 0.98em;
+  }
+  .snapshot-card {
+    padding: 6px;
+    min-width: 90vw;
+    max-width: 98vw;
+  }
+}

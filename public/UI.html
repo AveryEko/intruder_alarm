@@ -1,87 +1,405 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Intruder Alarm Dashboard</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-</head>
-<body>
-  <h1>Intruder Alarm System</h1>
-
-  <div id="controls">
-    <h2>System Controls</h2>
-    <div>
-      <label>ESP32-CAM:</label>
-      <button id="arm-esp32">Arm</button>
-      <button id="disarm-esp32">Disarm</button>
-      <span id="esp32-status"></span>
-    </div>
-    <div>
-      <label>Arduino Uno:</label>
-      <button id="arm-arduino">Arm</button>
-      <button id="disarm-arduino">Disarm</button>
-      <span id="arduino-status"></span>
-    </div>
-  </div>
-
-  <div id="alert">
-    <h2>Alerts</h2>
-    <div id="alert-content">No alerts.</div>
-  </div>
-
-  <a href="snapshots.html" class="btn">View Snapshots</a>
-
-  <script>
-    // TODO: Replace with your Firebase config!
-    var firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      databaseURL: "https://fiot-aa4f5-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "fiot-aa4f5",
-      storageBucket: "fiot-aa4f5.appspot.com",
-      messagingSenderId: "YOUR_MESSAGING_ID",
-      appId: "YOUR_APP_ID"
-    };
-    firebase.initializeApp(firebaseConfig);
-
-    var statusRef = firebase.database().ref("systemStatus");
-    var alertRef = firebase.database().ref("alerts/lastAlert");
-
-    // Status updates
-    statusRef.child("esp32").on("value", function(snap) {
-      var data = snap.val();
-      document.getElementById("esp32-status").innerText =
-        "Status: " + (data && data.armed ? "Armed" : "Disarmed") + ", Motion: " + (data && data.motionDetected ? "Intruder!" : "Clear");
-    });
-    statusRef.child("arduino").on("value", function(snap) {
-      var data = snap.val();
-      document.getElementById("arduino-status").innerText =
-        "Status: " + (data && data.armed ? "Armed" : "Disarmed") + ", Motion: " + (data && data.motionDetected ? "Intruder!" : "Clear");
-    });
-
-    // Arm/disarm controls
-    document.getElementById("arm-esp32").onclick = function() {
-      statusRef.child("esp32").update({ armed: true });
-    };
-    document.getElementById("disarm-esp32").onclick = function() {
-      statusRef.child("esp32").update({ armed: false });
-    };
-    document.getElementById("arm-arduino").onclick = function() {
-      statusRef.child("arduino").update({ armed: true });
-    };
-    document.getElementById("disarm-arduino").onclick = function() {
-      statusRef.child("arduino").update({ armed: false });
-    };
-
-    // Alert monitor
-    alertRef.on("value", function(snap) {
-      var alert = snap.val();
-      if(alert && alert.type === "intruder") {
-        document.getElementById("alert-content").innerHTML =
-          `<b>Intruder Detected!</b> Device: ${alert.device} at ${alert.timestamp}`;
+  <head>
+    <title>Intruder Alarm Dashboard</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+      #esp32-connection-status,
+      #arduino-connection-status {
+        display: inline-block;
+        margin-left: 12px;
+        font-weight: bold;
+        color: #218838;
       }
-    });
-  </script>
-</body>
+      #esp32-connection-status.offline,
+      #arduino-connection-status.offline {
+        color: #dc3545;
+      }
+      #esp32-hardware-status.online,
+      #arduino-hardware-status.online {
+        color: #218838;
+        font-weight: bold;
+      }
+      #esp32-hardware-status.offline,
+      #arduino-hardware-status.offline {
+        color: #dc3545;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="title" style="text-align: center">Intruder Alarm System</h1>
+
+    <div id="controls" class="container">
+      <h2>System Controls</h2>
+      <div>
+        <label>ESP32-CAM:</label>
+        <button id="arm-esp32">Arm</button>
+        <button id="disarm-esp32">Disarm</button>
+        <span id="esp32-status"></span>
+        <span id="esp32-connection-status">Checking...</span>
+      </div>
+      <div>
+        <label>Arduino Uno:</label>
+        <button id="arm-arduino">Arm</button>
+        <button id="disarm-arduino">Disarm</button>
+        <span id="arduino-status"></span>
+        <span id="arduino-connection-status">Checking...</span>
+      </div>
+    </div>
+
+    <div id="hardware-status" class="container">
+      <h2>Hardware Status</h2>
+      <div id="esp32-hardware-status">...</div>
+      <div id="arduino-hardware-status">...</div>
+    </div>
+
+    <div id="alert" class="container">
+      <h2>Alerts</h2>
+      <div id="alert-content">No alerts.</div>
+    </div>
+
+    <div id="snapshot-gallery" class="container">
+      <h2>Snapshots</h2>
+      <button id="show-gallery-btn">Show Gallery</button>
+      <button id="hide-gallery-btn" style="display:none;">Hide Gallery</button>
+      <div id="snapshots"></div>
+    </div>
+
+    <!-- Modal for viewing snapshot -->
+    <div id="snapshot-modal">
+      <div id="snapshot-modal-content">
+        <button id="snapshot-modal-close">&times;</button>
+        <img id="snapshot-modal-img" src="" alt="Snapshot" />
+        <div id="snapshot-modal-timestamp" class="timestamp"></div>
+      </div>
+    </div>
+
+    <script>
+      // ThingSpeak endpoints and channel info
+      const THINGSPEAK_CHANNEL_ID = "3033231";
+      const THINGSPEAK_READ_API_KEY = "N6598QTZTIAWCV0H";
+      const THINGSPEAK_WRITE_API_KEY = "KOU513ED704T5O07";
+      const ARM_FIELD = 5;
+      const STATUS_FIELD = 3; // field3 for ESP32 heartbeat
+
+      // Your other endpoints
+      const PHP_ALERTS_URL =
+        "https://fiot-intruder-alarm.infinityfree.me/server/alerts.php";
+      const PHP_HEARTBEAT_URL =
+        "https://fiot-intruder-alarm.infinityfree.me/server/esp32_heartbeat.php";
+      const PHP_ARDUINO_HEARTBEAT_URL =
+        "https://fiot-intruder-alarm.infinityfree.me/server/arduino_heartbeat.php"; // <-- you must implement this endpoint for Arduino status
+
+      // --- ESP32 Arm/Disarm via ThingSpeak field5 ---
+      let armPending = false;
+      let lastArmRequested = null;
+      async function pollEsp32ArmStatus(fastPoll = false) {
+        const url = `https://api.thingspeak.com/channels/${THINGSPEAK_CHANNEL_ID}/fields/${ARM_FIELD}/last.json?api_key=${THINGSPEAK_READ_API_KEY}`;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("ThingSpeak fetch failed");
+          const data = await res.json();
+          const armed = data[`field${ARM_FIELD}`] === "1";
+          const statusElem = document.getElementById("esp32-status");
+          if (armPending) {
+            if (
+              (lastArmRequested === "arm" && armed) ||
+              (lastArmRequested === "disarm" && !armed)
+            ) {
+              armPending = false;
+              lastArmRequested = null;
+              statusElem.innerText = armed ? "Armed" : "Disarmed";
+            } else {
+              // Keep polling quickly until done
+              statusElem.innerText = lastArmRequested === "arm" ? "Arming..." : "Disarming...";
+              setTimeout(() => pollEsp32ArmStatus(true), 1500);
+              return;
+            }
+          } else {
+            statusElem.innerText = armed ? "Armed" : "Disarmed";
+          }
+        } catch (err) {
+          document.getElementById("esp32-status").innerText = "Status Error";
+        }
+      }
+
+      document.getElementById("arm-esp32").onclick = async function () {
+        armPending = true;
+        lastArmRequested = "arm";
+        document.getElementById("esp32-status").innerText = "Arming...";
+        await fetch(`https://api.thingspeak.com/update?api_key=${THINGSPEAK_WRITE_API_KEY}&field${ARM_FIELD}=1`);
+        pollEsp32ArmStatus(true); // Start fast polling after click
+      };
+
+      document.getElementById("disarm-esp32").onclick = async function () {
+        armPending = true;
+        lastArmRequested = "disarm";
+        document.getElementById("esp32-status").innerText = "Disarming...";
+        await fetch(`https://api.thingspeak.com/update?api_key=${THINGSPEAK_WRITE_API_KEY}&field${ARM_FIELD}=0`);
+        pollEsp32ArmStatus(true); // Start fast polling after click
+      };
+
+      setInterval(() => {
+        if (!armPending) pollEsp32ArmStatus();
+      }, 5000);
+
+      // --- Arduino controls: still use your PHP backend if needed ---
+      const PHP_STATUS_URL = "https://fiot-intruder-alarm.infinityfree.me/server/status.php";
+      let arduinoArmPending = false;
+      let arduinoLastArmRequested = null;
+      async function pollArduinoArmStatus(fastPoll = false) {
+        try {
+          const res = await fetch(PHP_STATUS_URL);
+          if (!res.ok) throw new Error("Status fetch failed");
+          const data = await res.json();
+          const armed = !!data.arduinoArmed;
+          const statusElem = document.getElementById("arduino-status");
+          if (arduinoArmPending) {
+            if (
+              (arduinoLastArmRequested === "arm" && armed) ||
+              (arduinoLastArmRequested === "disarm" && !armed)
+            ) {
+              arduinoArmPending = false;
+              arduinoLastArmRequested = null;
+              statusElem.innerText = armed ? "Armed" : "Disarmed";
+            } else {
+              // Fast polling until status changes
+              statusElem.innerText = arduinoLastArmRequested === "arm" ? "Arming..." : "Disarming...";
+              setTimeout(() => pollArduinoArmStatus(true), 1500);
+              return;
+            }
+          } else {
+            statusElem.innerText = armed ? "Armed" : "Disarmed";
+          }
+        } catch (err) {
+          document.getElementById("arduino-status").innerText = "Status Error";
+        }
+      }
+      document.getElementById("arm-arduino").onclick = async function () {
+        arduinoArmPending = true;
+        arduinoLastArmRequested = "arm";
+        document.getElementById("arduino-status").innerText = "Arming...";
+        await fetch(PHP_STATUS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "arduinoArmed=true",
+        });
+        pollArduinoArmStatus(true);
+      };
+      document.getElementById("disarm-arduino").onclick = async function () {
+        arduinoArmPending = true;
+        arduinoLastArmRequested = "disarm";
+        document.getElementById("arduino-status").innerText = "Disarming...";
+        await fetch(PHP_STATUS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "arduinoArmed=false",
+        });
+        pollArduinoArmStatus(true);
+      };
+      setInterval(() => {
+        if (!arduinoArmPending) pollArduinoArmStatus();
+      }, 5000);
+
+      // Poll Arduino status as before for hardware info
+      async function pollStatus() {
+        try {
+          const res = await fetch(PHP_STATUS_URL);
+          if (!res.ok) throw new Error("Status fetch failed");
+          const data = await res.json();
+          document.getElementById("arduino-hardware-status").innerText =
+            (data.arduinoStatus ? data.arduinoStatus : "Unknown") +
+            ", " +
+            (data.arduinoArmed ? "Armed" : "Disarmed");
+        } catch (err) {
+          document.getElementById("arduino-hardware-status").innerText =
+            "Error fetching Arduino status";
+        }
+      }
+
+      // Alerts unchanged
+      async function pollAlerts() {
+        try {
+          const res = await fetch(PHP_ALERTS_URL);
+          if (!res.ok) throw new Error("Alerts fetch failed");
+          const alert = await res.json();
+          if (alert && alert.type === "intruder") {
+            document.getElementById(
+              "alert-content"
+            ).innerHTML = `<b>Intruder Detected!</b> Device: ${alert.device} at ${alert.timestamp}`;
+          } else {
+            document.getElementById("alert-content").innerText = "No alerts.";
+          }
+        } catch (err) {
+          document.getElementById("alert-content").innerText =
+            "Error fetching alerts.";
+        }
+      }
+
+      // --- ESP32 Hardware Status Poll (Heartbeat via ThingSpeak field3) ---
+      async function pollEsp32HardwareStatus() {
+        const url = `https://api.thingspeak.com/channels/${THINGSPEAK_CHANNEL_ID}/fields/${STATUS_FIELD}/last.json?api_key=${THINGSPEAK_READ_API_KEY}`;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("ThingSpeak status fetch failed");
+          const data = await res.json();
+          const lastUpdateTime = new Date(data.created_at);
+          const now = new Date();
+          const secondsAgo = (now - lastUpdateTime) / 1000;
+          const online = secondsAgo < 30; // Mark online if heartbeat within last 30 seconds
+          const hwStatus = document.getElementById("esp32-hardware-status");
+          if (online) {
+            hwStatus.innerText = `Online (last seen ${Math.floor(secondsAgo)}s ago)`;
+            hwStatus.classList.add("online");
+            hwStatus.classList.remove("offline");
+            document.getElementById("esp32-connection-status").innerText = "Online";
+            document.getElementById("esp32-connection-status").classList.remove("offline");
+          } else {
+            hwStatus.innerText = `Offline (last seen ${Math.floor(secondsAgo)}s ago)`;
+            hwStatus.classList.add("offline");
+            hwStatus.classList.remove("online");
+            document.getElementById("esp32-connection-status").innerText = "Offline";
+            document.getElementById("esp32-connection-status").classList.add("offline");
+          }
+        } catch (err) {
+          const hwStatus = document.getElementById("esp32-hardware-status");
+          hwStatus.innerText = "Status Error";
+          hwStatus.classList.remove("online");
+          hwStatus.classList.add("offline");
+          document.getElementById("esp32-connection-status").innerText = "Status Error";
+          document.getElementById("esp32-connection-status").classList.add("offline");
+        }
+      }
+
+      // --- Arduino Hardware Status Poll ---
+      async function pollArduinoHardwareStatus() {
+        // Replace this with your actual endpoint logic.
+        // Example: The endpoint should return { last_seen: unix_timestamp }
+        try {
+          const res = await fetch(PHP_ARDUINO_HEARTBEAT_URL);
+          if (!res.ok) throw new Error("Arduino heartbeat fetch failed");
+          const data = await res.json();
+          const lastSeen = data.last_seen ? parseInt(data.last_seen) : 0;
+          const now = Math.floor(Date.now() / 1000);
+          const secondsAgo = now - lastSeen;
+          const online = secondsAgo < 30; // "Online" if last seen < 30 sec ago
+          const hwStatus = document.getElementById("arduino-hardware-status");
+          if (online) {
+            hwStatus.innerText = `Online (last seen ${secondsAgo}s ago)`;
+            hwStatus.classList.add("online");
+            hwStatus.classList.remove("offline");
+            document.getElementById("arduino-connection-status").innerText = "Online";
+            document.getElementById("arduino-connection-status").classList.remove("offline");
+          } else {
+            hwStatus.innerText = `Offline (last seen ${secondsAgo}s ago)`;
+            hwStatus.classList.add("offline");
+            hwStatus.classList.remove("online");
+            document.getElementById("arduino-connection-status").innerText = "Offline";
+            document.getElementById("arduino-connection-status").classList.add("offline");
+          }
+        } catch (err) {
+          const hwStatus = document.getElementById("arduino-hardware-status");
+          hwStatus.innerText = "Status Error";
+          hwStatus.classList.remove("online");
+          hwStatus.classList.add("offline");
+          document.getElementById("arduino-connection-status").innerText = "Status Error";
+          document.getElementById("arduino-connection-status").classList.add("offline");
+        }
+      }
+
+      // Use ThingSpeak as the source of snapshots
+      let lastSnapshotsData = [];
+      async function pollSnapshots() {
+        const url =
+          `https://api.thingspeak.com/channels/${THINGSPEAK_CHANNEL_ID}/feeds.json?api_key=${THINGSPEAK_READ_API_KEY}&results=21`;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error("Snapshots fetch failed");
+          const data = await res.json();
+          lastSnapshotsData = data.feeds && data.feeds.length > 0
+            ? data.feeds.filter(f => f.field1 && f.created_at)
+            : [];
+          renderSnapshotsGallery();
+        } catch (err) {
+          document.getElementById("snapshots").innerHTML =
+            "<div>Error loading snapshots.</div>";
+        }
+      }
+
+      function renderSnapshotsGallery() {
+        const snapshotsDiv = document.getElementById("snapshots");
+        if (!lastSnapshotsData || lastSnapshotsData.length === 0) {
+          snapshotsDiv.innerHTML = "<div>No snapshots yet.</div>";
+          return;
+        }
+        let html = "";
+        // Show most recent first
+        const snaps = [...lastSnapshotsData].reverse();
+        for (let i = 0; i < snaps.length; i += 3) {
+          html += `<div class="snapshot-gallery-row">`;
+          for (let j = i; j < i + 3 && j < snaps.length; j++) {
+            html += `<div class="snapshot-card" data-img="${snaps[j].field1}" data-timestamp="${snaps[j].created_at}">
+              <img src="${snaps[j].field1}" alt="Snapshot" />
+              <div class="timestamp">${snaps[j].created_at}</div>
+            </div>`;
+          }
+          html += `</div>`;
+        }
+        snapshotsDiv.innerHTML = html;
+
+        // Add click listeners for modal view
+        document.querySelectorAll('.snapshot-card').forEach(card => {
+          card.onclick = function() {
+            showSnapshotModal(
+              card.getAttribute('data-img'),
+              card.getAttribute('data-timestamp')
+            );
+          }
+        });
+      }
+
+      // Modal logic
+      function showSnapshotModal(img, timestamp) {
+        document.getElementById("snapshot-modal-img").src = img;
+        document.getElementById("snapshot-modal-timestamp").innerText = timestamp;
+        document.getElementById("snapshot-modal").style.display = "flex";
+      }
+      document.getElementById("snapshot-modal-close").onclick = function() {
+        document.getElementById("snapshot-modal").style.display = "none";
+      };
+      document.getElementById("snapshot-modal").onclick = function(event) {
+        if (event.target === this) {
+          document.getElementById("snapshot-modal").style.display = "none";
+        }
+      };
+
+      // Gallery show/hide logic
+      document.getElementById("show-gallery-btn").onclick = function() {
+        document.getElementById("snapshots").style.display = "flex";
+        document.getElementById("show-gallery-btn").style.display = "none";
+        document.getElementById("hide-gallery-btn").style.display = "inline-block";
+        pollSnapshots();
+      };
+      document.getElementById("hide-gallery-btn").onclick = function() {
+        document.getElementById("snapshots").style.display = "none";
+        document.getElementById("show-gallery-btn").style.display = "inline-block";
+        document.getElementById("hide-gallery-btn").style.display = "none";
+      };
+
+      // Initial polling for status and alerts only (gallery loads only when opened)
+      pollEsp32ArmStatus();
+      pollArduinoArmStatus();
+      pollStatus();
+      pollAlerts();
+      pollEsp32HardwareStatus();
+      pollArduinoHardwareStatus();
+
+      setInterval(pollStatus, 2000);
+      setInterval(pollAlerts, 5000);
+      setInterval(pollEsp32HardwareStatus, 10000); // ESP32 hardware status poll every 10s
+      setInterval(pollArduinoHardwareStatus, 10000); // Arduino hardware status poll every 10s
+
+    </script>
+  </body>
 </html>

@@ -6,9 +6,10 @@ const fetch = require('node-fetch'); // install using: npm i node-fetch@2
 const app = express();
 const port = 3000;
 
-// Firebase Realtime Database
-const FIREBASE_URL = "https://your-project-id.firebaseio.com/intruderStatus.json";
-const FIREBASE_SECRET = "YOUR_DATABASE_SECRET";
+// PHP Backend URLs
+const PHP_STATUS_URL = "https://fiot-intruder-alarm.infinityfree.me/server/status.php";
+const PHP_ALERTS_URL = "https://fiot-intruder-alarm.infinityfree.me/server/alerts.php"; // optional
+const PHP_SNAPSHOTS_URL = "https://fiot-intruder-alarm.infinityfree.me/server/snapshots.php"; // optional
 
 // Sessions
 app.use(session({
@@ -55,34 +56,77 @@ app.get('/logout', (req, res) => {
   });
 });
 
-// 👉 POST /arm or /disarm
-app.post('/arm', async (req, res) => {
-  await updateStatus("Armed");
-  res.send("System armed via web.");
+// 👉 POST /arm-esp32 or /disarm-esp32
+app.post('/arm-esp32', async (req, res) => {
+  await updateBackendStatus({ esp32Armed: true });
+  res.send("ESP32 system armed via web.");
 });
 
-app.post('/disarm', async (req, res) => {
-  await updateStatus("Disarmed");
-  res.send("System disarmed via web.");
+app.post('/disarm-esp32', async (req, res) => {
+  await updateBackendStatus({ esp32Armed: false });
+  res.send("ESP32 system disarmed via web.");
 });
 
-// 👉 GET /status
+// 👉 POST /arm-arduino or /disarm-arduino
+app.post('/arm-arduino', async (req, res) => {
+  await updateBackendStatus({ arduinoArmed: true });
+  res.send("Arduino Uno system armed via web.");
+});
+
+app.post('/disarm-arduino', async (req, res) => {
+  await updateBackendStatus({ arduinoArmed: false });
+  res.send("Arduino Uno system disarmed via web.");
+});
+
+// 👉 GET /status (returns both ESP32 and Arduino status)
 app.get('/status', async (req, res) => {
   try {
-    const r = await fetch(`${FIREBASE_URL}?auth=${FIREBASE_SECRET}`);
+    const r = await fetch(PHP_STATUS_URL);
     const json = await r.json();
-    res.json({ status: json.status || "Unknown" });
+    res.json({
+      esp32Armed: json.esp32Armed,
+      arduinoArmed: json.arduinoArmed,
+      esp32Status: json.esp32Status || "Unknown",
+      arduinoStatus: json.arduinoStatus || "Unknown"
+    });
   } catch {
-    res.status(500).json({ status: "Error" });
+    res.status(500).json({ esp32Armed: false, arduinoArmed: false, esp32Status: "Error", arduinoStatus: "Error" });
   }
 });
 
-// 🔄 Update Firebase
-async function updateStatus(status) {
-  await fetch(`${FIREBASE_URL}?auth=${FIREBASE_SECRET}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status })
+// 👉 GET /alerts (optional)
+app.get('/alerts', async (req, res) => {
+  try {
+    const r = await fetch(PHP_ALERTS_URL);
+    const json = await r.json();
+    res.json(json);
+  } catch {
+    res.status(500).json({ type: "none" });
+  }
+});
+
+// 👉 GET /snapshots (optional)
+app.get('/snapshots', async (req, res) => {
+  try {
+    const r = await fetch(PHP_SNAPSHOTS_URL);
+    const json = await r.json();
+    res.json(json);
+  } catch {
+    res.status(500).json([]);
+  }
+});
+
+// 🔄 Update PHP backend status
+async function updateBackendStatus(updates) {
+  // updates = {esp32Armed: true/false, arduinoArmed: true/false}
+  const params = new URLSearchParams();
+  if ('esp32Armed' in updates) params.append('esp32Armed', updates.esp32Armed);
+  if ('arduinoArmed' in updates) params.append('arduinoArmed', updates.arduinoArmed);
+
+  await fetch(PHP_STATUS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString()
   });
 }
 
