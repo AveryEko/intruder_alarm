@@ -1,98 +1,134 @@
-# intruder_alarm
-Hardware used: 
-  Arduino Uno
-  LiquidCrystal_I2C
-  Keypad
-  Infrared sensor
-  ESP 01, wifi module
-  ESP 32, camera module
-  Wifi/Hotspot device
+# Intruder Alarm
 
-# applications used
-  VSCode
-  Arduino IDE (Arduino board & ESP32 module)
-  BotFather (To display messages on telegram)
-    .Modify bot token and chat id in Arduino code
-  Thinkspeak (Controlling intruder alarm via application)
-  Firebase (Realtime database)
-  
-# code (run npm install "module_name")
-Modules required:
-  Node.js
-  express
+A comprehensive DIY intruder alarm system using Arduino, ESP32-CAM, ThingSpeak, Telegram, and web dashboard technologies.
 
-To host website, run: "node app.js"
+---
 
-# login page (currently hardcoded, no backend)
-  User details:
-    username: admin
-    password: 123
-    username: user1
-    password: password
+## 🚨 Overview
 
-# userInterface page (currently hardcoded, no backend)
-  Pin: 123456
+**Intruder Alarm** is a modular, IoT-based security system designed for home or small office use. It combines hardware sensors, wireless communication, cloud logging, instant alerts, and a modern web UI to deliver real-time protection and monitoring.
 
-# STEP-BY-STEP FLOW
-🔐 1. User Logs In
-User visits http://localhost:3000/login.html
+---
 
-Enters username & password (admin / 1234)
+## 🛠️ Hardware Used
 
-Server creates a session
+- **ESP32-CAM**: Motion detection, image capture, WiFi connectivity
+- **Arduino Uno/Nano**: Sensor hub (PIR), communicates with ESP modules
+- **ESP-01/ESP8266**: WiFi module for Arduino
+- **Sensors**: PIR motion sensor, buzzer, relay
+- **Input**: Keypad
+- **Ouput**: LCD Screen
+- **Cloud Services**:
+  - **ThingSpeak**: Data logging, control, status
+  - **Telegram Bot**: Instant alerts to your phone
+  - **Cloudinary**: Image hosting for intruder snapshots
 
-User is redirected to userInterface.html
+---
 
-🟢 2. User Arms the System
-Clicks “Arm” button on frontend
+## 📦 Features
 
-Frontend makes a POST /arm or GET /api/arm to backend (you'll create this)
+- **Remote Arm/Disarm** via web dashboard (ThingSpeak control)
+- **Instant Intruder Alerts** sent to Telegram
+- **Live Hardware Status** (heartbeat monitoring of ESP32 and Arduino)
+- **Snapshot Gallery**: Intruder images captured and uploaded to Cloudinary, viewable in the web dashboard
+- **Cloud Logging**: All status and events recorded to ThingSpeak for historical review and control
+- **Modular Design**: Easily add/remove sensors or notification channels
 
-Backend sends a WiFi command (e.g. via serial or WiFi HTTP) to ESP-01 (optional, since Arduino already arms manually via keypad too)
+---
 
-🔴 3. Intruder Detected
-IR sensor on Arduino outputs LOW when motion is detected
+## 🖥️ Web Dashboard
 
-Arduino:
+- Built with **HTML, CSS, JavaScript** (Bootstrap for styling)
+- Controls for arming/disarming both ESP32-CAM and Arduino
+- Displays hardware online/offline status
+- Shows recent intruder alerts and snapshot gallery
+- Responsive layout for desktop and mobile
 
-Turns on buzzer
+---
 
-Shows INTRUDER ALERT! on LCD
+## 🗂️ Repository Structure
 
-Sends HTTP request from ESP-01 to your Node.js server (e.g. /api/intrusion)
+```
+/arduino/             # Arduino Uno/Nano code for sensors and WiFi communication
+/esp32-cam/           # ESP32-CAM firmware for image capture, ThingSpeak, Telegram
+/public/              # Web dashboard (HTML, CSS, JS)
+/public/css/          # Custom dashboard styles
+/public/js/           # Dashboard scripts (UI, ThingSpeak API, gallery)
+/public/UI.html       # Main dashboard page
+/public/login.html    # Login/authentication page
+/public/img/          # Icons and UI images
+/README.md            # This file
+```
 
-cpp
-Copy code
-GET /api/intrusion?msg=alert
-Sets a flag to prevent multiple alerts
+---
 
-📸 4. ESP32-CAM Captures Image
-If connected via WiFi (separate), it can:
+## ⚡ How It Works
 
-Be triggered by Arduino via an HTTP request to ESP32-CAM’s IP (using ESP-01)
+1. **Sensors** (PIR, door) trigger Arduino.
+2. **Arduino** (with ESP-01) logs data/status into ThingSpeak, sends heartbeat.
+3. **ESP32-CAM** checks ThingSpeak for "armed" status and intruder flag.
+4. On detection, **ESP32-CAM**:
+    - Captures snapshots
+    - Uploads images to Cloudinary
+    - Logs event and image URL to ThingSpeak
+    - Sends Telegram alert to user
+5. **Web Dashboard** displays live status, recent alerts, and image gallery.
 
-Or Arduino can broadcast a request to your Node.js backend, which in turn sends a request to ESP32-CAM
+---
 
-ESP32-CAM saves image or streams it to a folder, Firebase, or directly to the server
+## 📝 Setup & Installation
 
-🌐 5. Website Gets Alert
-Node.js backend receives /api/intrusion
+### Hardware
 
-It updates:
+1. **Wire up sensors to Arduino** (see `/arduino/` sketches for pin mappings).
+2. **Connect ESP-01 to Arduino** (serial, 3.3V, GND).
+3. **Set up ESP32-CAM** on separate power (can run standalone).
 
-Logs
+### Software
 
-Sends alert to frontend via fetch polling, Socket.io, or refresh
+1. **Flash Arduino code** from `/arduino/` folder.
+2. **Flash ESP32-CAM code** from `/esp32-cam/` folder.
+3. Edit WiFi, ThingSpeak, Telegram, Cloudinary credentials in code.
+4. **Deploy web dashboard**: upload `/public/` folder to your web hosting.
 
-(Optional) triggers UI flash or sound on frontend
+### Cloud Services
 
-🛑 6. User Disarms
-Via keypad on Arduino (# key + correct passcode)
+- **ThingSpeak**: Create channel, fields for arm/disarm, heartbeat, status, alerts, snapshots.
+- **Telegram Bot**: Create bot, get token, chat ID.
+- **Cloudinary**: Create account, get upload preset and cloud name for image hosting.
 
-Or clicks “Disarm” on website
+---
 
-Website sends POST /disarm
+## 🔒 Security Notes
 
-Arduino receives it (if 2-way communication via ESP-01 or polling)
+- Change default passwords in all scripts and dashboard.
+- Use HTTPS for web dashboard hosting.
+- Secure your Telegram bot token and Cloudinary credentials.
 
-Turns off buzzer and resets
+---
+
+## 💡 Customization
+
+- Add more sensors (gas, vibration, etc.) via Arduino.
+- Integrate SMS, email, or other notification channels.
+- Extend dashboard for multi-zone support.
+
+---
+
+## 👤 Authors & Credits
+
+- [AveryEko](https://github.com/AveryEko)  
+- [IJIn00001](https://github.com/IJIn00001)  
+- Community resources, open source libraries
+
+---
+
+## 📜 License
+
+This project is open-source. See [LICENSE](LICENSE) for details.
+
+---
+
+## 📞 Support & Issues
+
+Open an [issue](https://github.com/AveryEko/intruder_alarm/issues) for questions, bugs, or feature requests.
