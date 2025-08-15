@@ -1,5 +1,6 @@
 body {
-  background-color: #111;
+  background: url('/public/img/image.png');
+  background-color: rgba(0, 0, 0, 0.01); 
   color: #f8f9fa;
   font-family: Arial, sans-serif;
   min-height: 100vh;

@@ -1,6 +1,6 @@
 body {
   margin: 0;
-  background: url("/img/image.png") no-repeat center center fixed;
+  background: url("/public/img/image.png") no-repeat center center fixed;
   background-size: cover;
   display: flex;
   justify-content: center;

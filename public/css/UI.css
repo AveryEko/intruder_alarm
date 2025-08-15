@@ -1,5 +1,5 @@
 body {
-  background-color: black;
+  background: url('/public/img/image.png');
   color: white;
   font-family: Arial, sans-serif;
   height: 100vh;
