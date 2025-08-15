@@ -26,33 +26,67 @@
 const char* ssid = "el pepe";
 const char* password = "3guys1cup";
 
+// ========== Telegram Credentials ==========
+const char* botToken = "8487225038:AAEGP1PIjXzR0RVDMo-e0DZLMkuFzTxTSHo";
+const char* chatId = "1677478547";
+
 // ========== Cloudinary Credentials ==========
 const char* cloud_name = "dlr6drgoj";
 const char* upload_preset = "ESP32-CAM";
 
 // ========== ThingSpeak Credentials ==========
-const char* thingspeak_api_key = "KOU513ED704T5O07"; // For uploading snapshots (field1) and heartbeat (field3)
-const char* thingspeak_read_api_key = "N6598QTZTIAWCV0H"; // For reading arm/disarm
+const char* thingspeak_api_key = "KOU513ED704T5O07";
+const char* thingspeak_read_api_key = "N6598QTZTIAWCV0H";
 const char* thingspeak_channel_id = "3033231";
-const int ARM_FIELD = 5; // Use field5 for arm/disarm
-const int STATUS_FIELD = 3; // Use field3 for heartbeat/status
+const int ARM_FIELD = 5;      // Use field5 for arm/disarm
+const int INTRUDER_FIELD = 1; // Use field1 for intruder detection
+const int STATUS_FIELD = 3;   // Use field3 for heartbeat/status
 
 // ========== InfinityFree Endpoint ==========
 const char* backend_url = "https://fiot-intruder-alarm.infinityfree.me/server/add_snapshot.php";
 
-// ========== Arm/Disarm Logic ==========
-// Default: DISARMED (no snapshots taken)
+// --- Heartbeat: Send ESP32 status to field3 every 10 seconds
+unsigned long lastHeartbeat = 0;
+const unsigned long heartbeatInterval = 10000;
 
-void startCameraServer();
-void setupLedFlash();
+void sendHeartbeat() {
+  String url = "http://api.thingspeak.com/update?api_key=";
+  url += thingspeak_api_key;
+  url += "&field3=1";
+  HTTPClient http;
+  if (http.begin(url)) {
+    int code = http.GET();
+    http.end();
+    Serial.printf("Heartbeat sent to field3. HTTP %d\n", code);
+  } else {
+    Serial.println("Heartbeat HTTP begin failed!");
+  }
+}
 
+// --- Add Telegram message sending function
+void sendTelegramMessage(String msg) {
+  String url = "https://api.telegram.org/bot" + String(botToken) +
+               "/sendMessage?chat_id=" + String(chatId) + "&text=" + msg;
+  HTTPClient http;
+  http.begin(url);
+  int httpCode = http.GET();
+  if (httpCode > 0) {
+    String response = http.getString();
+    Serial.println(response);
+  } else {
+    Serial.println("Error sending message: " + String(httpCode));
+  }
+  http.end();
+}
+
+// Poll field5 for arm/disarm status
 bool pollArmedStatus() {
   HTTPClient http;
-  String armUrl = String("http://api.thingspeak.com/channels/") + thingspeak_channel_id +
+  String url = String("http://api.thingspeak.com/channels/") + thingspeak_channel_id +
                   "/fields/" + String(ARM_FIELD) + "/last.json?api_key=" + thingspeak_read_api_key;
-  http.begin(armUrl);
+  http.begin(url);
   int httpCode = http.GET();
-  bool armed = false; // Default: disarmed
+  bool armed = false;
   if (httpCode == 200) {
     String payload = http.getString();
     Serial.println("ThingSpeak payload: " + payload);
@@ -72,22 +106,136 @@ bool pollArmedStatus() {
   return armed;
 }
 
-// --- Heartbeat: Send ESP32 status to field3 every 5 seconds
-unsigned long lastHeartbeat = 0;
-const unsigned long heartbeatInterval = 5000; // 5 seconds
-
-void sendHeartbeat() {
-  String url = "http://api.thingspeak.com/update?api_key=";
-  url += thingspeak_api_key;
-  url += "&field3=1"; // You could use a timestamp or just '1' to indicate alive
+// Poll field1 for intruder status
+bool pollIntruderStatus() {
   HTTPClient http;
-  if (http.begin(url)) {
-    int code = http.GET();
-    http.end();
-    Serial.printf("Heartbeat sent to field3. HTTP %d\n", code);
+  String url = String("http://api.thingspeak.com/channels/") + thingspeak_channel_id +
+                  "/fields/" + String(INTRUDER_FIELD) + "/last.json?api_key=" + thingspeak_read_api_key;
+  http.begin(url);
+  int httpCode = http.GET();
+  bool intruder = false;
+  if (httpCode == 200) {
+    String payload = http.getString();
+    Serial.println("ThingSpeak payload: " + payload);
+    int pos = payload.indexOf("\"field1\":\"");
+    if (pos != -1) {
+      int valStart = pos + 10;
+      char val = payload[valStart];
+      intruder = (val == '1');
+      Serial.printf("ThingSpeak: intruderDetected = %s\n", intruder ? "true" : "false");
+    } else {
+      Serial.println("Could not parse field1 from ThingSpeak JSON");
+    }
   } else {
-    Serial.println("Heartbeat HTTP begin failed!");
+    Serial.printf("ThingSpeak poll failed: HTTP %d\n", httpCode);
   }
+  http.end();
+  return intruder;
+}
+
+void uploadPhotoAndNotify(const String &imageUrl) {
+  // ---- ThingSpeak Update (for snapshots) ----
+  if (imageUrl.length() > 0) {
+    String tsUrl = "http://api.thingspeak.com/update?api_key=";
+    tsUrl += thingspeak_api_key;
+    tsUrl += "&field1=";
+    tsUrl += imageUrl;
+
+    HTTPClient tsHttp;
+    if (!tsHttp.begin(tsUrl)) {
+      Serial.println("ThingSpeak HTTP begin failed!");
+      return;
+    }
+    int tsCode = tsHttp.GET();
+    String tsResp = tsHttp.getString();
+    if (tsCode > 0) {
+      Serial.printf("ThingSpeak update: HTTP %d\n", tsCode);
+      Serial.println(tsResp);
+    } else {
+      Serial.printf("ThingSpeak update failed: HTTP %d\n", tsCode);
+    }
+    tsHttp.end();
+
+    // ---- POST to InfinityFree backend ----
+    HTTPClient backendHttp;
+    if (backendHttp.begin(backend_url)) {
+      backendHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
+      unsigned long now = millis();
+      String timestamp = String(now);
+
+      String postData = "url=" + imageUrl + "&timestamp=" + timestamp;
+      int backendCode = backendHttp.POST(postData);
+      String backendResp = backendHttp.getString();
+      Serial.printf("Snapshot POST: HTTP %d\n", backendCode);
+      Serial.println(backendResp);
+      backendHttp.end();
+    } else {
+      Serial.println("Failed to connect to backend for snapshot POST!");
+    }
+  }
+}
+
+String uploadPhotoToCloudinary(camera_fb_t *fb) {
+  HTTPClient http;
+  String url = "https://api.cloudinary.com/v1_1/" + String(cloud_name) + "/image/upload";
+  if (!http.begin(url)) {
+    Serial.println("Cloudinary HTTP begin failed!");
+    return "";
+  }
+
+  String boundary = "CloudinaryBoundary";
+  String startRequest = "--" + boundary + "\r\n"
+    "Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\n"
+    "Content-Type: image/jpeg\r\n\r\n";
+  String midRequest = "\r\n--" + boundary + "\r\n"
+    "Content-Disposition: form-data; name=\"upload_preset\"\r\n\r\n" + String(upload_preset) + "\r\n";
+  String endRequest = "--" + boundary + "--\r\n";
+
+  int totalLen = startRequest.length() + fb->len + midRequest.length() + endRequest.length();
+  uint8_t* postBuffer = (uint8_t*)malloc(totalLen);
+  if (!postBuffer) {
+    Serial.println("Failed to allocate memory for POST buffer!");
+    http.end();
+    return "";
+  }
+
+  int idx = 0;
+  memcpy(postBuffer + idx, startRequest.c_str(), startRequest.length());
+  idx += startRequest.length();
+  memcpy(postBuffer + idx, fb->buf, fb->len);
+  idx += fb->len;
+  memcpy(postBuffer + idx, midRequest.c_str(), midRequest.length());
+  idx += midRequest.length();
+  memcpy(postBuffer + idx, endRequest.c_str(), endRequest.length());
+  idx += endRequest.length();
+
+  http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+  Serial.println("Uploading to Cloudinary...");
+  int httpCode = http.POST(postBuffer, totalLen);
+  String response = http.getString();
+
+  free(postBuffer);
+  http.end();
+
+  String imageUrl = "";
+  if (httpCode == 200) {
+    Serial.println("Upload successful!");
+    int urlStart = response.indexOf("\"secure_url\":\"");
+    if (urlStart != -1) {
+      urlStart += 14;
+      int urlEnd = response.indexOf("\"", urlStart);
+      imageUrl = response.substring(urlStart, urlEnd);
+      Serial.println("Image URL: " + imageUrl);
+    } else {
+      Serial.println("Could not parse image URL");
+      Serial.println(response);
+    }
+  } else {
+    Serial.printf("Cloudinary upload failed: HTTP %d\n", httpCode);
+    Serial.println(response);
+  }
+  return imageUrl;
 }
 
 void setup() {
@@ -164,15 +312,10 @@ void setup() {
   Serial.println("");
   Serial.println("WiFi connected");
 
-  startCameraServer();
-
   Serial.print("Camera Ready! Use 'http://");
   Serial.print(WiFi.localIP());
   Serial.println("' to connect");
 }
-
-unsigned long lastUpload = 0;
-const unsigned long uploadInterval = 20000; // 20 seconds
 
 void loop() {
   // Heartbeat: update field3 every 5 seconds
@@ -181,7 +324,7 @@ void loop() {
     sendHeartbeat();
   }
 
-  // Check armed status from ThingSpeak field5
+  // Poll field5 for arm/disarm status
   bool esp32Armed = pollArmedStatus();
 
   if (!esp32Armed) {
@@ -190,123 +333,40 @@ void loop() {
     return;
   }
 
-  // Armed: perform regular logic (photo upload, etc.)
-  if (millis() - lastUpload > uploadInterval) {
-    lastUpload = millis();
-    camera_fb_t *fb = esp_camera_fb_get();
-    if (!fb) {
-      Serial.println("Camera capture failed");
-      return;
-    }
+  // Armed: poll field1 for intruder status
+  bool intruderDetected = pollIntruderStatus();
 
-    Serial.printf("Photo captured: %zu bytes\n", fb->len);
+  if (intruderDetected) {
+    // --- SEND TELEGRAM MESSAGE ---
+    sendTelegramMessage("Intruder detected");
 
-    // ---- Cloudinary Upload (buffer-based) ----
-    HTTPClient http;
-    String url = "https://api.cloudinary.com/v1_1/" + String(cloud_name) + "/image/upload";
-    if (!http.begin(url)) {
-      Serial.println("Cloudinary HTTP begin failed!");
+    Serial.println("INTRUDER DETECTED! Taking 10 snapshots...");
+    for (int i = 0; i < 10; i++) {
+      camera_fb_t *fb = esp_camera_fb_get();
+      if (!fb) {
+        Serial.println("Camera capture failed");
+        continue;
+      }
+
+      Serial.printf("Photo %d captured: %zu bytes\n", i+1, fb->len);
+
+      // Upload to Cloudinary
+      String imageUrl = uploadPhotoToCloudinary(fb);
+
       esp_camera_fb_return(fb);
-      return;
+
+      // Notify ThingSpeak and backend
+      uploadPhotoAndNotify(imageUrl);
+
+      Serial.printf("Snapshot %d uploaded and notified.\n", i+1);
+      delay(1000); // Wait 1 second before next snapshot
     }
 
-    String boundary = "CloudinaryBoundary";
-    String startRequest = "--" + boundary + "\r\n"
-      "Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\n"
-      "Content-Type: image/jpeg\r\n\r\n";
-    String midRequest = "\r\n--" + boundary + "\r\n"
-      "Content-Disposition: form-data; name=\"upload_preset\"\r\n\r\n" + String(upload_preset) + "\r\n";
-    String endRequest = "--" + boundary + "--\r\n";
-
-    int totalLen = startRequest.length() + fb->len + midRequest.length() + endRequest.length();
-    uint8_t* postBuffer = (uint8_t*)malloc(totalLen);
-    if (!postBuffer) {
-      Serial.println("Failed to allocate memory for POST buffer!");
-      http.end();
-      esp_camera_fb_return(fb);
-      return;
-    }
-
-    int idx = 0;
-    memcpy(postBuffer + idx, startRequest.c_str(), startRequest.length());
-    idx += startRequest.length();
-    memcpy(postBuffer + idx, fb->buf, fb->len);
-    idx += fb->len;
-    memcpy(postBuffer + idx, midRequest.c_str(), midRequest.length());
-    idx += midRequest.length();
-    memcpy(postBuffer + idx, endRequest.c_str(), endRequest.length());
-    idx += endRequest.length();
-
-    http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
-
-    Serial.println("Uploading to Cloudinary...");
-    int httpCode = http.POST(postBuffer, totalLen);
-    String response = http.getString();
-
-    free(postBuffer);
-    http.end();
-    esp_camera_fb_return(fb);
-
-    String imageUrl = "";
-    if (httpCode == 200) {
-      Serial.println("Upload successful!");
-      int urlStart = response.indexOf("\"secure_url\":\"");
-      if (urlStart != -1) {
-        urlStart += 14;
-        int urlEnd = response.indexOf("\"", urlStart);
-        imageUrl = response.substring(urlStart, urlEnd);
-        Serial.println("Image URL: " + imageUrl);
-      } else {
-        Serial.println("Could not parse image URL");
-        Serial.println(response);
-      }
-    } else {
-      Serial.printf("Cloudinary upload failed: HTTP %d\n", httpCode);
-      Serial.println(response);
-    }
-
-    // ---- ThingSpeak Update (for snapshots) ----
-    if (imageUrl.length() > 0) {
-      String tsUrl = "http://api.thingspeak.com/update?api_key=";
-      tsUrl += thingspeak_api_key;
-      tsUrl += "&field1=";
-      tsUrl += imageUrl;
-
-      HTTPClient tsHttp;
-      if (!tsHttp.begin(tsUrl)) {
-        Serial.println("ThingSpeak HTTP begin failed!");
-        return;
-      }
-      int tsCode = tsHttp.GET();
-      String tsResp = tsHttp.getString();
-      if (tsCode > 0) {
-        Serial.printf("ThingSpeak update: HTTP %d\n", tsCode);
-        Serial.println(tsResp);
-      } else {
-        Serial.printf("ThingSpeak update failed: HTTP %d\n", tsCode);
-      }
-      tsHttp.end();
-
-      // ---- POST to InfinityFree backend ----
-      HTTPClient backendHttp;
-      if (backendHttp.begin(backend_url)) {
-        backendHttp.addHeader("Content-Type", "application/x-www-form-urlencoded");
-
-        unsigned long now = millis();
-        String timestamp = String(now);
-
-        String postData = "url=" + imageUrl + "&timestamp=" + timestamp;
-        int backendCode = backendHttp.POST(postData);
-        String backendResp = backendHttp.getString();
-        Serial.printf("Snapshot POST: HTTP %d\n", backendCode);
-        Serial.println(backendResp);
-        backendHttp.end();
-      } else {
-        Serial.println("Failed to connect to backend for snapshot POST!");
-      }
-    }
-
-    Serial.println("Waiting for next photo...");
+    Serial.println("10 snapshots done. Waiting 10 seconds before next poll...");
+    delay(10000); // Wait 10 seconds before next poll
+  } else {
+    // No intruder detected, poll again in 5 seconds
+    Serial.println("No intruder detected. Waiting 5 seconds...");
+    delay(5000);
   }
-  delay(100); // Don't hammer loop
 }

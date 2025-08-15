@@ -2,26 +2,17 @@
 #include <LiquidCrystal_I2C.h>
 #include <Keypad.h>
 
-// =====================
 // --- CONFIGURATION ---
-// =====================
-const char* WIFI_SSID     = "Lovely Family";
-const char* WIFI_PASSWORD = "24022004";
-
-const char* THINGSPEAK_READ_API_KEY  = "N6598QTZTIAWCV0H";
+const char* WIFI_SSID     = "el pepe";
+const char* WIFI_PASSWORD = "3guys1cup";
 const char* THINGSPEAK_WRITE_API_KEY = "KOU513ED704T5O07";
-const char* THINGSPEAK_CHANNEL_ID    = "3033231";
 const int ARDUINO_ARM_FIELD          = 6;
 const int ARDUINO_INTRUDER_FIELD     = 1;
-const int ARDUINO_HEARTBEAT_FIELD    = 4; // <--- heartbeat field
+const int ARDUINO_HEARTBEAT_FIELD    = 4;
 
-// =====================
-// --- SYSTEM STATE  ---
-// =====================
+// --- SYSTEM STATE ---
 bool intruderDetected = false;
-unsigned long buzzerStartTime = 0;
-const unsigned long buzzerDuration = 5000;
-
+bool alertSent = false;            // NEW: Only send alert once per detection
 LiquidCrystal_I2C lcd(0x3F, 16, 2);
 const int buzzerPin = 5;
 const int irPin = 6;
@@ -51,6 +42,11 @@ const unsigned long armPollInterval = 5000;
 unsigned long lastHeartbeat = 0;
 const unsigned long heartbeatInterval = 10000; // 10 seconds
 
+bool pendingArmStatus = false;
+bool pendingArmStatusValue = false; // true: armed, false: disarmed
+
+bool showingIntruderScreen = false;
+
 void setup() {
   Serial.begin(9600);
   esp.begin(9600);
@@ -61,7 +57,7 @@ void setup() {
   lcd.init();
   lcd.backlight();
   lcd.print("System Initializing");
-  delay(2000);
+  delay(1500);
   lcd.clear();
   lcd.print("Enter Code:");
 
@@ -83,34 +79,53 @@ void loop() {
     lastHeartbeat = millis();
     sendThingSpeakHeartbeat();
   }
+
+  // Non-blocking: send arm status if needed
+  if (pendingArmStatus) {
+    sendThingSpeakArmStatus(pendingArmStatusValue);
+    pendingArmStatus = false;
+  }
 }
 
 void handleKeypad() {
   char key = keypad.getKey();
   if (key) {
+    Serial.print("Key pressed: "); Serial.println(key);
+    // When intruder detected, always show code entry screen
+    if (intruderDetected && !showingIntruderScreen) {
+      lcd.clear();
+      lcd.print("Enter Code:");
+      showingIntruderScreen = true;
+    }
     if (key == '#') {
       if (inputBuffer == passcode) {
         if (intruderDetected) {
           isArmed = false;
           intruderDetected = false;
-          digitalWrite(buzzerPin, LOW);
+          alertSent = false; // Reset for next detection
+          digitalWrite(buzzerPin, LOW); // TURN OFF BUZZER HERE!
           lcd.clear();
           lcd.print("System Disarmed");
-          delay(1000);
+          pendingArmStatusValue = isArmed;
+          pendingArmStatus = true;
+          delay(1500);
           lcd.clear();
           lcd.print("Enter Code:");
+          showingIntruderScreen = false;
         } else {
           isArmed = !isArmed;
           lcd.clear();
           lcd.print(isArmed ? "System Armed" : "System Disarmed");
-          delay(1000);
+          pendingArmStatusValue = isArmed;
+          pendingArmStatus = true;
+          delay(1500);
           lcd.clear();
           lcd.print("Enter Code:");
         }
       } else {
         lcd.clear();
         lcd.print("Wrong Code!");
-        delay(1000);
+        delay(1500);
         lcd.clear();
         lcd.print("Enter Code:");
       }
@@ -128,64 +143,74 @@ void handleKeypad() {
 }
 
 void checkIntrusion() {
+  // Detection logic: Only trigger if armed and IR sensor is LOW and not already in alert
   if (isArmed && digitalRead(irPin) == LOW && !intruderDetected) {
-    delay(100);
+    delay(30); // minimal debounce
     if (digitalRead(irPin) == LOW) {
       triggerIntruderAlert();
     }
   }
 
-  if (intruderDetected && millis() - buzzerStartTime >= buzzerDuration) {
-    digitalWrite(buzzerPin, LOW);
-    lcd.clear();
-    lcd.print("Enter Code:");
-    intruderDetected = false;
+  // Buzzer logic: KEEP BUZZING as long as intruderDetected
+  if (intruderDetected) {
+    digitalWrite(buzzerPin, HIGH); // BUZZER ON
+    // Only send alert ONCE per detection
+    if (!alertSent) {
+      sendThingSpeakAlert();
+      alertSent = true;
+    }
+    // No timeout logic!
   }
 }
 
 void triggerIntruderAlert() {
   lcd.clear();
   lcd.print("INTRUDER ALERT!");
-  digitalWrite(buzzerPin, HIGH);
-  sendThingSpeakAlert();
+  // Buzzer stays on until disarmed, so don't start/stop here
   intruderDetected = true;
-  buzzerStartTime = millis();
+  showingIntruderScreen = false; // Will switch to code screen on next keypad event
+  // alertSent is handled in checkIntrusion
 }
 
-void sendAT(String cmd, int wait = 2000) {
+// Remaining functions unchanged...
+void sendAT(String cmd, int wait = 400) {
   esp.println(cmd);
-  delay(wait);
   unsigned long tStart = millis();
-  while (esp.available() && millis() - tStart < wait) {
-    String response = esp.readStringUntil('\n');
-    Serial.println(response);
+  while (millis() - tStart < wait) {
+    if (esp.available()) {
+      String response = esp.readStringUntil('\n');
+      Serial.println(response);
+    }
   }
 }
 
 void initWiFi() {
-  sendAT("AT+RST", 3000);
-  sendAT("AT+CWMODE=1");
+  sendAT("AT+RST", 800);
+  sendAT("AT+CWMODE=1", 300);
   String wifiCmd = "AT+CWJAP=\"" + String(WIFI_SSID) + "\",\"" + String(WIFI_PASSWORD) + "\"";
-  sendAT(wifiCmd, 8000);
-  sendAT("AT+CWJAP?", 1200);
+  sendAT(wifiCmd, 1200);
+  sendAT("AT+CWJAP?", 300);
 }
 
 void sendThingSpeakAlert() {
   String host = "api.thingspeak.com";
   String url = "/update?api_key=" + String(THINGSPEAK_WRITE_API_KEY) + "&field" + String(ARDUINO_INTRUDER_FIELD) + "=1";
-  sendAT("AT+CIPSTART=\"TCP\",\"" + host + "\",80", 2500);
+  Serial.println("Sending alert to ThingSpeak: " + url);
+  sendAT("AT+CIPSTART=\"TCP\",\"" + host + "\",80", 400);
 
   String request = "GET " + url + " HTTP/1.1\r\nHost: " + host + "\r\nConnection: close\r\n\r\n";
   esp.print("AT+CIPSEND=");
   esp.println(request.length());
+  delay(150);
 
-  // Wait for '>' prompt
+  // Wait for '>' prompt for up to 400ms
   unsigned long tStart = millis();
   bool gotPrompt = false;
-  while (millis() - tStart < 3000) {
+  while (millis() - tStart < 400) {
     if (esp.available()) {
-      char c = esp.read();
-      if (c == '>') {
+      String line = esp.readStringUntil('\n');
+      Serial.println(line);
+      if (line.indexOf(">") >= 0) {
         gotPrompt = true;
         break;
       }
@@ -193,32 +218,73 @@ void sendThingSpeakAlert() {
   }
   if (gotPrompt) {
     esp.print(request);
-    delay(2000);
+    delay(200);
+    while (esp.available()) {
+      String line = esp.readStringUntil('\n');
+      Serial.println(line);
+    }
+  } else {
+    Serial.println("ERROR: No > prompt from ESP-01");
+    lcd.clear();
+    lcd.print("Alert Failed!");
+    delay(150);
+    lcd.clear();
+    lcd.print("Enter Code:");
+  }
+  sendAT("AT+CIPCLOSE", 200);
+}
+
+void sendThingSpeakArmStatus(bool armed) {
+  String host = "api.thingspeak.com";
+  String url = "/update?api_key=" + String(THINGSPEAK_WRITE_API_KEY) + "&field" + String(ARDUINO_ARM_FIELD) + "=" + (armed ? "1" : "0");
+  Serial.println("Sending to ThingSpeak: " + url); // Add this
+  sendAT("AT+CIPSTART=\"TCP\",\"" + host + "\",80", 400);
+
+  String request = "GET " + url + " HTTP/1.1\r\nHost: " + host + "\r\nConnection: close\r\n\r\n";
+  esp.print("AT+CIPSEND=");
+  esp.println(request.length());
+  delay(150);
+
+  unsigned long tStart = millis();
+  bool gotPrompt = false;
+  while (millis() - tStart < 400) {
+    if (esp.available()) {
+      String line = esp.readStringUntil('\n');
+      Serial.println(line);
+      if (line.indexOf(">") >= 0) {
+        gotPrompt = true;
+        break;
+      }
+    }
+  }
+  if (gotPrompt) {
+    esp.print(request);
+    delay(200);
     while (esp.available()) {
       String line = esp.readStringUntil('\n');
       Serial.println(line);
     }
   }
-  sendAT("AT+CIPCLOSE", 1000);
+  sendAT("AT+CIPCLOSE", 200);
 }
 
-// HEARTBEAT TO THINGSPEAK FIELD4
 void sendThingSpeakHeartbeat() {
   String host = "api.thingspeak.com";
   String url = "/update?api_key=" + String(THINGSPEAK_WRITE_API_KEY) + "&field" + String(ARDUINO_HEARTBEAT_FIELD) + "=1";
-  sendAT("AT+CIPSTART=\"TCP\",\"" + host + "\",80", 2500);
+  sendAT("AT+CIPSTART=\"TCP\",\"" + host + "\",80", 400);
 
   String request = "GET " + url + " HTTP/1.1\r\nHost: " + host + "\r\nConnection: close\r\n\r\n";
   esp.print("AT+CIPSEND=");
   esp.println(request.length());
+  delay(150);
 
-  // Wait for '>' prompt
   unsigned long tStart = millis();
   bool gotPrompt = false;
-  while (millis() - tStart < 3000) {
+  while (millis() - tStart < 400) {
     if (esp.available()) {
-      char c = esp.read();
-      if (c == '>') {
+      String line = esp.readStringUntil('\n');
+      Serial.println(line);
+      if (line.indexOf(">") >= 0) {
         gotPrompt = true;
         break;
       }
@@ -226,28 +292,26 @@ void sendThingSpeakHeartbeat() {
   }
   if (gotPrompt) {
     esp.print(request);
-    delay(2000);
+    delay(200);
     while (esp.available()) {
       String line = esp.readStringUntil('\n');
       Serial.println(line);
     }
   }
-  sendAT("AT+CIPCLOSE", 1000);
+  sendAT("AT+CIPCLOSE", 200);
 }
 
-// POLL ARM/DISARM FROM THINGSPEAK FIELD6 (CHUNKED JSON SAFE)
 void pollArmDisarmFromWeb() {
-  sendAT("AT+CIPCLOSE", 500);
-  sendAT("AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80", 3000);
+  sendAT("AT+CIPCLOSE", 100);
+  sendAT("AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80", 400);
 
   String request = "GET /channels/3033231/fields/6/last.json?api_key=N6598QTZTIAWCV0H HTTP/1.1\r\nHost: api.thingspeak.com\r\nConnection: close\r\n\r\n";
   esp.print("AT+CIPSEND=");
   esp.println(request.length());
 
-  // Wait for '>' prompt
   unsigned long tStart = millis();
   bool gotPrompt = false;
-  while (millis() - tStart < 3000) {
+  while (millis() - tStart < 400) {
     if (esp.available() && esp.read() == '>') {
       gotPrompt = true;
       break;
@@ -258,17 +322,15 @@ void pollArmDisarmFromWeb() {
     return;
   }
 
-  // Send HTTP GET
   esp.print(request);
 
-  // Read for up to 20 seconds, look for JSON
   String jsonLine = "";
   unsigned long respStart = millis();
   bool foundJson = false;
-  while (millis() - respStart < 20000) {
+  while (millis() - respStart < 1000) {
     if (esp.available()) {
       String line = esp.readStringUntil('\n');
-      line.trim(); // remove leading/trailing whitespace
+      line.trim();
       if (line.startsWith("{") && line.endsWith("}")) {
         jsonLine = line;
         foundJson = true;
@@ -276,7 +338,7 @@ void pollArmDisarmFromWeb() {
       }
     }
   }
-  sendAT("AT+CIPCLOSE", 500);
+  sendAT("AT+CIPCLOSE", 100);
 
   if (foundJson) {
     Serial.print("JSON: "); Serial.println(jsonLine);
@@ -284,17 +346,18 @@ void pollArmDisarmFromWeb() {
     if (fieldIdx != -1) {
       char val = jsonLine.charAt(fieldIdx + 10);
       bool remoteArmed = (val == '1');
-      // Always update local state to match remote
       if (remoteArmed != isArmed) {
         isArmed = remoteArmed;
         lcd.clear();
         lcd.print(isArmed ? "System Armed" : "System Disarmed");
         Serial.println(isArmed ? "✅ Armed via Web" : "✅ Disarmed via Web");
-        delay(1000);
+        delay(150);
         lcd.clear();
         lcd.print("Enter Code:");
         intruderDetected = false;
+        alertSent = false;
         digitalWrite(buzzerPin, LOW);
+        showingIntruderScreen = false;
       }
     }
   } else {
