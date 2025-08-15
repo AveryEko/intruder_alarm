@@ -3,9 +3,10 @@
 #include <Keypad.h>
 
 // --- CONFIGURATION ---
-const char* WIFI_SSID     = "el pepe";
-const char* WIFI_PASSWORD = "3guys1cup";
-const char* THINGSPEAK_WRITE_API_KEY = "KOU513ED704T5O07";
+const char* WIFI_SSID     = "PLEASE_INPUT";
+const char* WIFI_PASSWORD = "PLEASE_INPUT";
+const char* THINGSPEAK_WRITE_API_KEY = "PLEASE_INPUT";
+//based on thingspeak field config
 const int ARDUINO_ARM_FIELD          = 6;
 const int ARDUINO_INTRUDER_FIELD     = 1;
 const int ARDUINO_HEARTBEAT_FIELD    = 4;

@@ -23,21 +23,21 @@
 #define PCLK_GPIO_NUM     22
 
 // ====== Wi-Fi ======
-const char* ssid = "el pepe";
-const char* password = "3guys1cup";
+const char* ssid = "PLEASE_INPUT";
+const char* password = "PLEASE_INPUT";
 
 // ========== Telegram Credentials ==========
-const char* botToken = "8487225038:AAEGP1PIjXzR0RVDMo-e0DZLMkuFzTxTSHo";
-const char* chatId = "1677478547";
+const char* botToken = "PLEASE_INPUT";
+const char* chatId = "PLEASE_INPUT";
 
 // ========== Cloudinary Credentials ==========
-const char* cloud_name = "dlr6drgoj";
-const char* upload_preset = "ESP32-CAM";
+const char* cloud_name = "PLEASE_INPUT";
+const char* upload_preset = "PLEASE_INPUT";
 
 // ========== ThingSpeak Credentials ==========
-const char* thingspeak_api_key = "KOU513ED704T5O07";
-const char* thingspeak_read_api_key = "N6598QTZTIAWCV0H";
-const char* thingspeak_channel_id = "3033231";
+const char* thingspeak_api_key = "PLEASE_INPUT";
+const char* thingspeak_read_api_key = "PLEASE_INPUT";
+const char* thingspeak_channel_id = "PLEASE_INPUT";
 const int ARM_FIELD = 5;      // Use field5 for arm/disarm
 const int INTRUDER_FIELD = 1; // Use field1 for intruder detection
 const int STATUS_FIELD = 3;   // Use field3 for heartbeat/status

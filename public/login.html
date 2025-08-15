@@ -28,13 +28,50 @@
           name="password"
           id="password"
           required
-        /><br /><br />
+        />
+        <button type="button" onclick="togglePassword()" class="btn btn-secondary btn-sm mb-2">Show/Hide Password</button>
+        <br /><br />
 
         <button type="submit" class="btn btn-primary w-100">Login</button>
       </form>
 
       <div id="message"></div>
     </div>
+    <!-- Inline JS starts here -->
+    <script>
+      const users = [
+        { username: "admin", password: "1234" },
+        { username: "user1", password: "password" }
+      ];
+
+      document.getElementById("loginForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value.trim();
+        const message = document.getElementById("message");
+
+        const user = users.find(u => u.username === username && u.password === password);
+
+        if (user) {
+          message.style.color = "lime";
+          message.textContent = "Login successful!";
+          setTimeout(() => {
+            window.location.href = "/public/UI.html"; //redirect to UI page
+          }, 500);
+        } else {
+          message.style.color = "red";
+          message.textContent = "Invalid username or password";
+        }
+      });
+
+      // Toggle password visibility
+      function togglePassword() {
+        const passwordInput = document.getElementById("password");
+        const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
+        passwordInput.setAttribute("type", type);
+      }
+    </script>
+    <!-- Inline JS ends here -->
   </body>
-  <script src="/public/js/login.js"></script>
 </html>
