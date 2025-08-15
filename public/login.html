@@ -12,12 +12,13 @@
     />
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/css/login.css" />
+    <link rel="stylesheet" href="/public/css/login.css" />
   </head>
   <body>
     <div class="login-container">
       <h2>Intruder Alarm Login</h2>
-      <form method="POST" action="/login.html">
+         <br/>
+        <form id="loginForm" method="POST" action="/login.html">
         <label for="username">Username</label><br />
         <input type="text" name="username" id="username" required /><br /><br />
 
@@ -35,5 +36,5 @@
       <div id="message"></div>
     </div>
   </body>
-  <script src="/js/login.js"></script>
+  <script src="/public/js/login.js"></script>
 </html>
